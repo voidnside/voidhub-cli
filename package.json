@@ -3,6 +3,9 @@
   "bin": {
     "voidhub": "./bin/voidhub.ts"
   },
+  "scripts" : {
+    "build": "git add . && git commit -m \"built\" && git push && bun link" 
+  },
   "module": "index.ts",
   "type": "module",
   "private": true,

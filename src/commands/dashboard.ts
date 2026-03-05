@@ -3,7 +3,7 @@ import { readConfig } from "../lib/config";
 
 /**
  * Opens the VoidHub dashboard README on GitHub in the browser.
- * URL: https://github.com/<username>/voidhub
+ * Uses `gh browse` which is already a hard dependency.
  */
 export async function dashboardCmd(): Promise<void> {
   const config = readConfig();
@@ -11,11 +11,5 @@ export async function dashboardCmd(): Promise<void> {
 
   console.log(`\n🌌 Opening dashboard: ${url}\n`);
 
-  try {
-    execSync(`gh browse --repo ${config.username}/voidhub`, { stdio: "inherit" });
-  } catch {
-    // gh browse not available — fall back to xdg-open / open
-    const opener = process.platform === "darwin" ? "open" : "xdg-open";
-    execSync(`${opener} ${url}`, { stdio: "inherit" });
-  }
+  execSync(`gh browse --repo ${config.username}/voidhub`, { stdio: "inherit" });
 }
