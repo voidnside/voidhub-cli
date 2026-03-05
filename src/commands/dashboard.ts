@@ -1,15 +1,11 @@
-import { execSync } from "child_process";
 import { readConfig } from "../lib/config";
 
 /**
- * Opens the VoidHub dashboard README on GitHub in the browser.
- * Uses `gh browse` which is already a hard dependency.
+ * Prints the VoidHub dashboard URL.
+ * Opening the browser is left to the user — gh browse is unreliable on WSL/headless.
  */
 export async function dashboardCmd(): Promise<void> {
   const config = readConfig();
   const url = `https://github.com/${config.username}/voidhub`;
-
-  console.log(`\n🌌 Opening dashboard: ${url}\n`);
-
-  execSync(`gh browse --repo ${config.username}/voidhub`, { stdio: "inherit" });
+  console.log(`\n🌌 Dashboard: ${url}\n`);
 }
