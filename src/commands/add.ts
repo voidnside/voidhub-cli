@@ -1,45 +1,86 @@
 import fs from "fs";
 import path from "path";
-import * as prompts from "@clack/prompts";
-import type { VoidHubConfig } from "../types";
-import { readConfig } from "../lib/config";
 import { execSync } from "child_process";
+import * as p from "@clack/prompts";
+import { readConfig } from "../lib/config";
+import { writeManifest } from "../lib/apps";
+import { ghRepoExists, ghCreateRepo } from "../lib/git";
+import type { AppManifest } from "../types";
 
-export async function addCmd() {
+export async function addCmd(): Promise<void> {
   const config = readConfig();
-  const appsDir = path.join(config.base, "apps");
-  fs.mkdirSync(appsDir, { recursive: true });
 
-  const name = await prompts.text({ message: "App Name:" });
-  if (typeof name !== "string") process.exit(0);
+  // 1. Prompt for name and slug
+  const name = await p.text({
+    message: "App name:",
+    validate: (v) => (v?.trim() ? undefined : "Name cannot be empty"),
+  });
+  if (p.isCancel(name)) return p.cancel("Cancelled.");
 
-  const slug = await prompts.text({ message: "App Slug (URL-friendly):" });
-  if (typeof slug !== "string") process.exit(0);
+  const slug = await p.text({
+    message: "App slug (URL-friendly, e.g. my-app):",
+    validate: (v) => {
+      if (!v?.trim()) return "Slug cannot be empty";
+      if (!/^[a-z0-9-]+$/.test(v)) return "Slug must be lowercase alphanumeric with dashes only";
+    },
+  });
+  if (p.isCancel(slug)) return p.cancel("Cancelled.");
 
-  const appPath = path.join(appsDir, slug);
-  fs.mkdirSync(appPath, { recursive: true });
+  // 2. Prompt for location within base (optional subdirectory)
+  const location = await p.text({
+    message: "Where inside your base folder? (relative path, or Enter for root)",
+    initialValue: "",
+    placeholder: "e.g. work/tools — leave empty to place directly in base",
+  });
+  if (p.isCancel(location)) return p.cancel("Cancelled.");
 
-  // create void.yaml
-  const yaml = `name: ${name}
-slug: ${slug}
-status: idea
-stage: idea
-visibility: private
-type: product
-stack:
-  - node
-energy: low
-priority: 3
-repo: https://github.com/${config.username}/${slug}
-last_review: YYYY-MM-DD
-`;
-  fs.writeFileSync(path.join(appPath, "void.yaml"), yaml);
+  const parentDir = (location as string).trim()
+    ? path.join(config.base, location as string)
+    : config.base;
+  const appDir = path.join(parentDir, slug as string);
 
-  // initialize git
-  execSync("git init", { cwd: appPath, stdio: "inherit" });
-  execSync(`git add .`, { cwd: appPath });
-  execSync(`git commit -m "chore: initial commit"`, { cwd: appPath });
+  if (fs.existsSync(appDir)) {
+    console.error(`❌ "${appDir}" already exists.`);
+    process.exit(1);
+  }
 
-  console.log(`\n✅ App ${name} (${slug}) created locally at ${appPath}`);
-  prompts.cancel();
+  // 3. Create local directory and void.json
+  fs.mkdirSync(appDir, { recursive: true });
+
+  const manifest: AppManifest = {
+    name: name as string,
+    slug: slug as string,
+    repo: `https://github.com/${config.username}/${slug}`,
+  };
+  writeManifest(appDir, manifest);
+
+  // 4. Git init and initial commit
+  execSync("git init -b main", { cwd: appDir, stdio: "inherit" });
+  execSync("git add .", { cwd: appDir, stdio: "inherit" });
+  execSync(`git commit -m "chore: initial commit"`, { cwd: appDir, stdio: "inherit" });
+
+  console.log(`\n✅ App "${name}" created at ${appDir}`);
+
+  // 5. Optionally create GitHub repo
+  const createRemote = await p.confirm({
+    message: `Create GitHub repo "${config.username}/${slug}" now?`,
+    initialValue: true,
+  });
+  if (p.isCancel(createRemote)) return p.cancel("Cancelled.");
+
+  if (createRemote) {
+    if (ghRepoExists(config.username, slug as string)) {
+      console.log(`  ℹ️  Repo ${config.username}/${slug} already exists on GitHub, skipping creation.`);
+    } else {
+      console.log(`⚡ Creating GitHub repo: ${config.username}/${slug}`);
+      ghCreateRepo(`${config.username}/${slug}`, { cwd: appDir });
+    }
+
+    execSync(`git remote add origin https://github.com/${config.username}/${slug}.git`, {
+      cwd: appDir,
+      stdio: "inherit",
+    });
+    execSync("git push -u origin main", { cwd: appDir, stdio: "inherit" });
+    console.log(`✅ Pushed to GitHub: https://github.com/${config.username}/${slug}`);
+  }
 }

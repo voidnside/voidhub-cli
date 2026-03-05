@@ -1,84 +1,133 @@
 # 🌌 VoidHub CLI
 
-VoidHub CLI is a lightweight tool for managing your personal projects and apps in a structured, GitHub-backed workspace.
+A lightweight CLI to track, scaffold, and back up your projects — locally and on GitHub.
 
-## Features
+## Concept
 
-* **Local-first SSOT**: All configuration and dashboard data are stored locally in `.voidhub`.
-* **Dashboard generation**: Automatic creation and sync of a central dashboard (`README.md`).
-* **App management**: Detect apps with `void.yaml` and track their status, stage, and metadata.
-* **GitHub integration**: Optional push of `.voidhub` for backup.
-* **Command-line workflow**: Simple and consistent commands for initialization, app addition, sync, and state checks.
+VoidHub creates a `.voidhub/` folder in your **base directory** (wherever your projects live). This folder contains:
+- `config.json` — your base path and GitHub username
+- `README.md` — your auto-generated dashboard (pin this on GitHub!)
+
+Any subdirectory anywhere under base that contains a `void.json` is recognized as an app — no required folder structure.
+
+```
+~/projects/                    ← base
+  .voidhub/
+    config.json
+    README.md                  ← your GitHub dashboard
+  my-app/
+    void.json
+  work/
+    client-site/
+      void.json
+    internal-tool/
+      void.json
+  experiments/
+    weekend-hack/
+      void.json
+```
+
+---
 
 ## Installation
 
 ```bash
-bun add -g voidhub-cli
+bun install
+bun link  # makes `voidhub` available globally
 ```
 
-## CLI Commands
+**Requirements:** [Bun](https://bun.sh), [gh CLI](https://cli.github.com) (authenticated)
 
-### init
+---
 
-Initialize VoidHub in the current directory. Prompts for base folder and GitHub username.
+## Commands
+
+### `voidhub init`
+Set up VoidHub in your base folder. Run this once.
+
+- Prompts for base folder and GitHub username (auto-detected via `gh api user`)
+- Creates `.voidhub/config.json` and a starter `README.md`
+- Backs up `.voidhub/` to `github.com/<you>/voidhub`
 
 ```bash
+cd ~/projects
 voidhub init
 ```
 
-### add
+---
 
-Add a new app locally and optionally on GitHub.
+### `voidhub add`
+Scaffold a new app anywhere under your base folder.
+
+- Prompts for name, slug, and optional subdirectory path within base
+- Creates `<location>/<slug>/void.json`
+- Runs `git init` and makes an initial commit
+- Optionally creates the GitHub repo and pushes
 
 ```bash
 voidhub add
+# App name: My New Tool
+# App slug: my-new-tool
+# Where inside your base folder? work/tools
+# Create GitHub repo? › yes
+# → created at ~/projects/work/tools/my-new-tool/
 ```
 
-### sync
+---
 
-Scan apps and update the local dashboard (`.voidhub/README.md`).
+### `voidhub sync`
+Rebuild the dashboard and push to GitHub.
+
+- Recursively scans base for any `void.json` file
+- Regenerates `.voidhub/README.md` with a table of all apps
+- Pushes `.voidhub/` to `github.com/<you>/voidhub`
 
 ```bash
 voidhub sync
 ```
 
-### check
+Pin `github.com/<you>/voidhub` in your browser — it's your live project dashboard.
 
-Check for differences between local apps and their GitHub state.
+---
+
+### `voidhub check`
+Find drift between local apps and GitHub repos.
+
+- Recursively scans base for `void.json` slugs
+- Compares against your GitHub repos via `gh repo list`
+- Reports local apps with no GitHub repo, and GitHub repos with no local `void.json`
 
 ```bash
 voidhub check
-```
 
-## void.yaml (per app)
-
-Each app must contain a `void.yaml` file as its source of truth:
-
-```yaml
-name: <app-name>
-slug: <app-slug>
-status: idea
-stage: idea
-visibility: private
-type: product
-stack:
-  - node
-energy: low
-priority: 3
-repo: https://github.com/<username>/<app-name>
-last_review: YYYY-MM-DD
+# 📂 Local apps not on GitHub:
+#    - My New Tool (my-new-tool)  ~/projects/work/tools/my-new-tool
+#
+# ☁️  GitHub repos not tracked locally:
+#    - old-experiment
 ```
 
 ---
 
-## Contributing
+## App Manifest (`void.json`)
 
-1. Fork the repository.
-2. Make changes to the CLI or scripts.
-3. Submit a pull request.
+```json
+{
+  "name": "My App",
+  "slug": "my-app",
+  "repo": "https://github.com/you/my-app"
+}
+```
+
+Minimal by design. Fields can be added over time — the schema is Zod-validated and forward-compatible.
 
 ---
 
-## License
+## Running from anywhere
 
-MIT License
+VoidHub walks up the directory tree to find `.voidhub/config.json`, so you can run any command from inside a project or any nested subdirectory — just like `git`.
+
+```bash
+cd ~/projects/work/tools/my-new-tool
+voidhub sync   # ✅ works
+```
