@@ -1,0 +1,12 @@
+name: Voidhub CLI
+slug: voidhub-cli
+status: idea
+stage: idea
+visibility: private
+type: product
+stack:
+  - node
+energy: low
+priority: 3
+repo: https://github.com/<username>/<app-name>
+last_review: YYYY-MM-DD

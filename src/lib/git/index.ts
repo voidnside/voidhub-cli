@@ -1,0 +1,1 @@
+export * from './detect-git-username'
